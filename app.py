@@ -46,35 +46,96 @@ page = st.sidebar.radio("Go to:", [
 ])
 
 
-# --- DATA LOADING ---
+# # --- DATA LOADING ---
+# @st.cache_data
+# def load_data():
+#     # 1. World Energy
+#     try:
+#         df_energy = pd.read_csv("data/world_energy.csv")
+#     except FileNotFoundError:
+#         st.error("File 'data/world_energy.csv' not found.")
+#         df_energy = None
+#
+#     # 2. Facility data
+#     try:
+#         # Load with header=3 to skip metadata
+#         df_facility = pd.read_csv("data/ghgp_data_2023.csv", header=3, low_memory=False)
+#         df_facility.columns = df_facility.columns.str.strip()
+#
+#         # Clean Emission Columns (2011-2023)
+#         year_cols = [str(y) + ' Total reported direct emissions' for y in range(2011, 2024)]
+#         for col in year_cols:
+#             if col in df_facility.columns:
+#                 df_facility[col] = df_facility[col].astype(str).str.replace(',', '', regex=False)
+#                 df_facility[col] = pd.to_numeric(df_facility[col], errors='coerce').fillna(0)
+#     except FileNotFoundError:
+#         st.error("File 'data/ghgp_data_2023.csv' not found.")
+#         df_facility = None
+#
+#     # 3. US Monthly data
+#     try:
+#         df_us_monthly = pd.read_csv("data/co2_footprint.csv")
+#         df_us_monthly['Value'] = pd.to_numeric(df_us_monthly['Value'], errors='coerce')
+#         df_us_monthly = df_us_monthly.dropna(subset=['Value'])
+#         df_us_monthly['YYYYMM'] = df_us_monthly['YYYYMM'].astype(str)
+#         df_us_monthly['Date'] = pd.to_datetime(df_us_monthly['YYYYMM'], format='%Y%m', errors='coerce')
+#         df_us_monthly = df_us_monthly.dropna(subset=['Date'])
+#         df_us_monthly['Year'] = df_us_monthly['Date'].dt.year
+#         df_us_monthly['Month'] = df_us_monthly['Date'].dt.month_name()
+#     except FileNotFoundError:
+#         df_us_monthly = None
+#
+#     return df_energy, df_facility, df_us_monthly
+
+import os
+
+
+# --- DATA LOADING FUNCTION ---
 @st.cache_data
 def load_data():
+    # Helper to find file regardless of "data" vs "Data" casing
+    def find_file(filename):
+        # List of possible paths to check
+        possible_paths = [
+            f"data/{filename}",
+            f"Data/{filename}",
+            filename  # Check root directory just in case
+        ]
+
+        for path in possible_paths:
+            if os.path.exists(path):
+                return path
+        return None
+
     # 1. World Energy
-    try:
-        df_energy = pd.read_csv("data/world_energy.csv")
-    except FileNotFoundError:
-        st.error("File 'data/world_energy.csv' not found.")
+    path_energy = find_file("world_energy.csv")
+    if path_energy:
+        df_energy = pd.read_csv(path_energy)
+    else:
+        st.error("File 'world_energy.csv' not found in 'data/' or 'Data/' folder.")
         df_energy = None
 
-    # 2. Facility data
-    try:
+    # 2. Facility Data
+    path_facility = find_file("ghgp_data_2023.csv")
+    if path_facility:
         # Load with header=3 to skip metadata
-        df_facility = pd.read_csv("data/ghgp_data_2023.csv", header=3, low_memory=False)
+        df_facility = pd.read_csv(path_facility, header=3, low_memory=False)
         df_facility.columns = df_facility.columns.str.strip()
 
-        # Clean Emission Columns (2011-2023)
+        # Clean Emission Columns
         year_cols = [str(y) + ' Total reported direct emissions' for y in range(2011, 2024)]
         for col in year_cols:
             if col in df_facility.columns:
                 df_facility[col] = df_facility[col].astype(str).str.replace(',', '', regex=False)
                 df_facility[col] = pd.to_numeric(df_facility[col], errors='coerce').fillna(0)
-    except FileNotFoundError:
-        st.error("File 'data/ghgp_data_2023.csv' not found.")
+    else:
+        st.error("File 'ghgp_data_2023.csv' not found.")
         df_facility = None
 
-    # 3. US Monthly data
-    try:
-        df_us_monthly = pd.read_csv("data/co2_footprint.csv")
+    # 3. US Monthly Data
+    path_monthly = find_file("co2_footprint.csv")
+    if path_monthly:
+        df_us_monthly = pd.read_csv(path_monthly)
         df_us_monthly['Value'] = pd.to_numeric(df_us_monthly['Value'], errors='coerce')
         df_us_monthly = df_us_monthly.dropna(subset=['Value'])
         df_us_monthly['YYYYMM'] = df_us_monthly['YYYYMM'].astype(str)
@@ -82,11 +143,12 @@ def load_data():
         df_us_monthly = df_us_monthly.dropna(subset=['Date'])
         df_us_monthly['Year'] = df_us_monthly['Date'].dt.year
         df_us_monthly['Month'] = df_us_monthly['Date'].dt.month_name()
-    except FileNotFoundError:
+    else:
+        # Check if user maybe named it differently in the repo?
+        st.warning("File 'co2_footprint.csv' not found.")
         df_us_monthly = None
 
     return df_energy, df_facility, df_us_monthly
-
 
 df_energy, df_facility, df_us_monthly = load_data()
 
